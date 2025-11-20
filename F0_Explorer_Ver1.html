@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>F0 Explorer — Generating a 2-D Crack-Tensor Trace Map</title>
+<style>
+  :root { --bg:#ffffff; --fg:#0b0c10; --muted:#6b7280; --accent:#1d4ed8; --card:#ffffff; --grid:#e5e7eb; }
+  html,body{height:100%;}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  header{padding:24px 24px;border-bottom:1px solid var(--grid);display:flex;flex-direction:column;align-items:flex-start;gap:4px;}
+  header h1{font-size:28px;margin:0;color:#111827;}
+  header .subtitle{font-size:18px;font-weight:600;color:#1f2937;}
+  .wrap{display:grid;grid-template-columns:320px 1fr;gap:16px;padding:16px;}
+  .card{background:var(--card);border:1px solid var(--grid);border-radius:14px;box-shadow:0 4px 14px rgba(0,0,0,.06);}
+  .panel{padding:14px 14px 10px 14px}
+  .panel h2{font-size:14px;margin:0 0 8px;color:#111827;}
+  label{font-size:12px;color:#374151}
+  input,select,button{width:100%;padding:8px 10px;border-radius:10px;border:1px solid var(--grid);background:#fff;color:var(--fg)}
+  input[type="checkbox"]{width:auto}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:8px}
+  .btn{cursor:pointer;background:linear-gradient(180deg,#60a5fa,#2563eb);color:#fff;border:none}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn-outline{background:transparent;border:1px solid var(--accent);color:var(--accent)}
+  .stat{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+  .stat .k{font-size:11px;color:#6b7280}
+  .stat .v{font-size:16px}
+  canvas{display:block;width:100%;height:100%;background:#fff}
+  .plots{display:grid;grid-template-columns:1.8fr 1.2fr;gap:16px;padding:14px}
+  .plot-card{height:740px}
+  .plot-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .footer{padding:8px 16px;color:#6b7280}
+  .tag{display:inline-block;padding:2px 6px;border:1px solid var(--grid);border-radius:8px;color:#111827;margin-right:6px;font-size:11px}
+  .inline-actions{display:flex;gap:8px;align-items:center;margin:6px 0 4px 0}
+  .inline-actions button{width:auto}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>F0 Explorer</h1>
+  <div class="subtitle">Generation of Crack Trace Maps and Calculation of 2-D Crack Tensors</div>
+</header>
+<div id="status" style="margin:8px 0;color:#0a0;font-size:12px;">ready</div>
+
+<div class="wrap">
+  <div class="card">
+    <div class="panel">
+      <h2>Parameters</h2>
+      <div class="row">
+        <div>
+          <label>Region width (n)</label>
+          <input id="n" type="number" value="100" min="10" step="1" />
+        </div>
+        <div>
+          <label>Region height (m)</label>
+          <input id="m" type="number" value="100" min="10" step="1" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Generation area scale (center-based)</label>
+          <input id="genScale" type="number" value="2" min="1" step="0.1" />
+        </div>
+        <div>
+          <label>Number of segments (mv)</label>
+          <input id="mv" type="number" value="2000" min="1" step="1" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Random seed</label>
+          <input id="seed" type="number" value="20250919" step="1" />
+        </div>
+        <div>
+          <label>Target F0 (optional)</label>
+          <input id="F0target" type="number" value="5" step="0.1" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Length distribution</label>
+          <select id="dist">
+            <option value="fixed">Fixed length</option>
+            <option value="normal">Normal (truncated: L&gt;0)</option>
+            <option value="lognormal" selected>Log-normal</option>
+          </select>
+        </div>
+        <div>
+          <label>Fixed length L (dist=fixed)</label>
+          <input id="Lfixed" type="number" value="10" step="0.1" />
+        </div>
+      </div>
+      <div class="row3">
+        <div>
+          <label>Normal μ</label>
+          <input id="normMu" type="number" value="10" step="0.1" />
+        </div>
+        <div>
+          <label>Normal σ</label>
+          <input id="normSigma" type="number" value="2" step="0.1" />
+        </div>
+        <div>
+          <label>Log-normal σ</label>
+          <input id="lognSigma" type="number" value="0.4" step="0.05" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label><input id="clipMode" type="checkbox" checked /> Include partial intersections (use clipped length for F0)</label>
+        </div>
+      </div>
+      <div class="row">
+        <button id="run" class="btn">Generate / Redraw</button>
+        <button id="reset" class="btn btn-outline">Reset</button>
+        <button id="matchF0" class="btn btn-outline">Greedy match F0</button>
+      </div>
+      <div class="row">
+        <button id="downloadSvg" class="btn btn-outline">Download geometry (SVG)</button>
+        <button id="downloadPdf" class="btn btn-outline">Download geometry (PDF)</button>
+      </div>
+
+      <div class="stat" id="statBox">
+        <div><div class="k">Inside (clipped/intersected)</div><div class="v" id="statInside">-</div></div>
+        <div><div class="k">Selected inside subset</div><div class="v" id="statSel">-</div></div>
+        <div><div class="k">F0</div><div class="v" id="statF0">-</div></div>
+      </div>
+      <div style="margin-top:10px">
+        <span class="tag">Liang–Barsky clipping</span>
+        <span class="tag">F0 = Σ L² / A (A = n×m)</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card plot-card">
+    <div class="plots">
+      <div class="panel" style="height:100%">
+        <div class="plot-head"><h2>Geometry</h2></div>
+        <canvas id="geom"></canvas>
+      </div>
+      <div class="panel" style="height:60%">
+        <div class="plot-head"><h2>Histogram (selected segment lengths)</h2></div>
+        <div class="inline-actions">
+          <button id="btnHistSvg" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;background:#f9fafb;cursor:pointer;">Download SVG</button>
+          <button id="btnCsvLen" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;background:#f9fafb;cursor:pointer;">Download length CSV</button>
+          <span style="color:#6b7280;font-size:12px;">Data used for the histogram</span>
+        </div>
+        <canvas id="hist"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="footer">Tip: Use a larger mv when adjusting F0 to improve stability.</div>
+
+<script>
+// ---------- Helpers ----------
+function RNG(seed){ let x=(seed>>>0)||123456789; return ()=>{ x^=x<<13; x^=x>>>17; x^=x<<5; return ((x>>>0)/4294967296); }; }
+function randn(r){ let u=1-r(); let v=r(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+function clipLiangBarsky(x0,y0,x1,y1,xmin,xmax,ymin,ymax){
+  const dx=x1-x0, dy=y1-y0; const p=[-dx,dx,-dy,dy]; const q=[x0-xmin,xmax-x0,y0-ymin,ymax-y0];
+  let u1=0,u2=1; for(let i=0;i<4;i++){ const pi=p[i], qi=q[i]; if(pi===0){ if(qi<0) return null; continue; }
+    const r=qi/pi; if(pi<0){ if(r>u2) return null; if(r>u1) u1=r; } else { if(r<u1) return null; if(r<u2) u2=r; } }
+  const cx0=x0+u1*dx, cy0=y0+u1*dy, cx1=x0+u2*dx, cy1=y0+u2*dy; if(Math.abs(cx0-cx1)+Math.abs(cy0-cy1)===0) return null; return [cx0,cy0,cx1,cy1]; }
+
+function makeCtx(id, {forceSquare=false}={}){
+  const c=document.getElementById(id); const d=c.getBoundingClientRect();
+  let w=d.width, h=d.height; if(forceSquare){ const s=Math.min(w,h); w=h=s; }
+  c.width=w*2; c.height=h*2; const ctx=c.getContext('2d'); ctx.scale(2,2); return ctx; }
+function clearCtx(ctx){ const c=ctx.canvas; ctx.clearRect(0,0,c.width, c.height); }
+
+function Mapper(xmin,xmax,ymin,ymax, w,h){
+  const pad=30; const sx=(w-2*pad)/(xmax-xmin); const sy=(h-2*pad)/(ymax-ymin); const s=Math.min(sx,sy);
+  const ox=pad - xmin*s; const oy=h-pad + ymin*s; // y-flip
+  return {
+    toXY:(x,y)=>[ox+x*s, oy - y*s],
+    drawRect(ctx,x0,x1,y0,y1,style){ ctx.save(); ctx.strokeStyle=style||'#111'; ctx.lineWidth=2; ctx.beginPath(); const a=this.toXY(x0,y0); const b=this.toXY(x1,y0); const c=this.toXY(x1,y1); const d=this.toXY(x0,y1); ctx.moveTo(...a); ctx.lineTo(...b); ctx.lineTo(...c); ctx.lineTo(...d); ctx.closePath(); ctx.stroke(); ctx.restore(); },
+    drawSeg(ctx,x0,y0,x1,y1, style='#000', lw=1){ ctx.save(); ctx.strokeStyle=style; ctx.lineWidth=lw; ctx.beginPath(); ctx.moveTo(...this.toXY(x0,y0)); ctx.lineTo(...this.toXY(x1,y1)); ctx.stroke(); ctx.restore(); }
+  };
+}
+
+let state={ all:[], insideClipped:[], chosenIdx:new Set(), stats:{F0:0, insideCount:0, chosenCount:0} };
+
+function sampleLengths(dist, mv, rng, Lfixed, mu, sigma, lognSigma){
+  const L=[]; if(dist==='fixed'){ for(let i=0;i<mv;i++) L.push(Lfixed); }
+  else if(dist==='normal'){ for(let i=0;i<mv;i++){ let v; do{ v=mu + sigma*randn(rng); }while(v<=0); L.push(v);} }
+  else { const logMu=Math.log(10); for(let i=0;i<mv;i++){ const z=logMu + lognSigma*randn(rng); L.push(Math.exp(z)); } }
+  return L;
+}
+
+function generate(){
+  const n=+document.getElementById('n').value, m=+document.getElementById('m').value;
+  const mv=+document.getElementById('mv').value, scale=+document.getElementById('genScale').value;
+  const dist=document.getElementById('dist').value, Lfixed=+document.getElementById('Lfixed').value;
+  const normMu=+document.getElementById('normMu').value, normSigma=+document.getElementById('normSigma').value;
+  const lognSigma=+document.getElementById('lognSigma').value, seed=+document.getElementById('seed').value;
+  const clipMode=document.getElementById('clipMode').checked; const rng=RNG(seed);
+
+  const rx0=0, ry0=0, rx1=n, ry1=m; const cx=(rx0+rx1)/2, cy=(ry0+ry1)/2;
+  const gw=n*scale, gh=m*scale; const gx0=cx-gw/2, gx1=cx+gw/2, gy0=cy-gh/2, gy1=cy+gh/2;
+
+  const Ls=sampleLengths(dist, mv, rng, Lfixed, normMu, normSigma, lognSigma);
+  const all=[]; for(let i=0;i<mv;i++){ const theta=2*Math.PI*rng(); const cx0=gx0+(gx1-gx0)*rng(); const cy0=gy0+(gy1-gy0)*rng(); const L=Ls[i]; const dx=0.5*L*Math.cos(theta), dy=0.5*L*Math.sin(theta); all.push({x0:cx0-dx,y0:cy0-dy,x1:cx0+dx,y1:cy0+dy,L}); }
+
+  const inside=[]; for(let i=0;i<all.length;i++){ const s=all[i]; if(clipMode){ const c=clipLiangBarsky(s.x0,s.y0,s.x1,s.y1, rx0,rx1,ry0,ry1); if(c){ const [ax,ay,bx,by]=c; const Lin=Math.hypot(bx-ax,by-ay); if(Lin>0) inside.push({cx0:ax,cy0:ay,cx1:bx,cy1:by,Lin,Lin2:Lin*Lin, idx:i}); } } else { const inBox=(s.x0>=rx0&&s.x0<=rx1&&s.x1>=rx0&&s.x1<=rx1&&s.y0>=ry0&&s.y0<=ry1&&s.y1>=ry0&&s.y1<=ry1); if(inBox){ const Lin=Math.hypot(s.x1-s.x0,s.y1-s.y0); inside.push({cx0:s.x0,cy0:s.y0,cx1:s.x1,cy1:s.y1,Lin,Lin2:Lin*Lin, idx:i}); } } }
+
+  state.all=all; state.insideClipped=inside; state.chosenIdx=new Set(inside.map((_,i)=>i));
+  updateStats(n,m); drawAll(n,m, gx0,gx1,gy0,gy1, rx0,rx1,ry0,ry1);
+}
+
+function updateStats(n,m){ const A=n*m; let sumsq=0, chosen=0; const inside=state.insideClipped; inside.forEach((seg,i)=>{ if(state.chosenIdx.has(i)){ sumsq+=seg.Lin2; chosen++; } }); const F0=sumsq/A; state.stats={F0, insideCount:inside.length, chosenCount:chosen}; document.getElementById('statInside').textContent=inside.length; document.getElementById('statSel').textContent=chosen; document.getElementById('statF0').textContent=F0.toFixed(3); drawHist(); }
+
+function drawAll(n,m, gx0,gx1,gy0,gy1, rx0,rx1,ry0,ry1){
+  const ctx=makeCtx('geom',{forceSquare:true}); clearCtx(ctx);
+  const W=ctx.canvas.clientWidth, H=ctx.canvas.clientHeight;
+  ctx.save(); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,W,H); ctx.restore();
+  const map=Mapper(gx0,gx1,gy0,gy1, W, H);
+  ctx.save(); ctx.strokeStyle='#e5e7eb'; ctx.lineWidth=1; ctx.setLineDash([4,6]);
+  for(let x=Math.ceil(gx0/25)*25; x<=gx1; x+=25){ ctx.beginPath(); const a=map.toXY(x, gy0); const b=map.toXY(x, gy1); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke(); }
+  for(let y=Math.ceil(gy0/25)*25; y<=gy1; y+=25){ ctx.beginPath(); const a=map.toXY(gx0, y); const b=map.toXY(gx1, y); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke(); }
+  ctx.restore();
+  map.drawRect(ctx, gx0,gx1,gy0,gy1, '#9ca3af');
+  map.drawRect(ctx, rx0,rx1,ry0,ry1, '#111827');
+  state.all.forEach(s=> map.drawSeg(ctx, s.x0,s.y0,s.x1,s.y1, '#9ca3af', 0.7));
+  state.insideClipped.forEach((seg,i)=>{ if(state.chosenIdx.has(i)) map.drawSeg(ctx, seg.cx0,seg.cy0,seg.cx1,seg.cy1, '#111827', 1.0); });
+}
+
+function drawHist(){
+  const ctx=makeCtx('hist'); clearCtx(ctx); const W=ctx.canvas.clientWidth, H=ctx.canvas.clientHeight;
+  ctx.save(); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,W,H); ctx.restore();
+
+  const allInside = state.insideClipped;
+  if (allInside.length === 0){
+    ctx.fillStyle='#6b7280'; ctx.fillText('No inside segments', 20, 24);
+    window.lastHistSnapshot = null; return;
+  }
+  const LmaxGlobal = Math.max(...allInside.map(s=>s.Lin));
+  const xmin = 0; const xmax = LmaxGlobal > 0 ? LmaxGlobal : 1;
+
+  const data=[]; state.insideClipped.forEach((s,i)=>{ if(state.chosenIdx.has(i)) data.push(s.Lin); });
+  const pad=40, w=W-2*pad, h=H-2*pad; const x0=pad, y0=H-pad;
+
+  if (data.length===0){
+    ctx.strokeStyle='#d1d5db'; ctx.strokeRect(x0, y0-h, w, h);
+    ctx.save(); ctx.strokeStyle = '#9ca3af'; ctx.fillStyle = '#111827'; ctx.font = '12px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    const tickCount = 5;
+    for (let t=0; t<tickCount; t++){
+      const u = (tickCount===1)?0:(t/(tickCount-1));
+      const x = x0 + u*w; const val = xmin + u*(xmax-xmin);
+      ctx.beginPath(); ctx.moveTo(x, y0+1); ctx.lineTo(x, y0+6); ctx.stroke();
+      const range = Math.abs(xmax - xmin);
+      const digits = range >= 100 ? 0 : range >= 10 ? 1 : range >= 1 ? 2 : range >= 0.1 ? 3 : 4;
+      ctx.fillText(val.toFixed(digits), x, y0+8);
+    }
+    ctx.restore();
+    ctx.fillStyle='#6b7280'; ctx.fillText('No selected segments', 20, 24);
+    window.lastHistSnapshot = { bins:24, min:xmin, max:xmax, cnt:new Array(24).fill(0), pad, w, h, x0, y0, W, H, ymax:1, wbin:(w/24) };
+    return;
+  }
+
+  const bins=24; const wbin=w/bins; const cnt=new Array(bins).fill(0); const range=(xmax - xmin) || 1e-9;
+  data.forEach(v=>{ const vv = Math.max(xmin, Math.min(xmax, v)); let k = Math.floor((vv - xmin)/range * bins); if (k>=bins) k=bins-1; if (k<0) k=0; cnt[k]++; });
+
+  ctx.strokeStyle='#d1d5db'; ctx.strokeRect(x0, y0-h, w, h);
+
+  const ymax=Math.max(...cnt,1);
+  for(let i=0;i<bins;i++){
+    const bh=cnt[i]/ymax*(h-2); ctx.fillStyle='#60a5fa'; ctx.fillRect(x0 + i*wbin + 1, y0 - bh, wbin - 2, bh);
+  }
+
+  ctx.save(); ctx.strokeStyle = '#9ca3af'; ctx.fillStyle = '#111827'; ctx.font = '12px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  const rangeX = Math.max(0, xmax - xmin); const targetTicks = 6;
+  function niceIntStep(r){ if (r <= 0) return 1; const pow10 = Math.pow(10, Math.floor(Math.log10(r/targetTicks))); const candidates = [1,2,5,10]; let best = pow10, bestDiff = Infinity; for (const c of candidates){ const s = c * pow10; const n = r / s; const diff = Math.abs(n - targetTicks); if (diff < bestDiff){ bestDiff = diff; best = s; } } return Math.max(1, Math.round(best)); }
+  const step = niceIntStep(rangeX);
+  for (let v = 0; v <= xmax + 1e-9; v += step){ const u = (v - xmin) / (xmax - xmin || 1); const x = x0 + u * w; ctx.beginPath(); ctx.moveTo(x, y0 + 1); ctx.lineTo(x, y0 + 6); ctx.stroke(); ctx.fillText(String(Math.round(v)), x, y0 + 8); }
+  ctx.restore();
+
+  ctx.fillStyle='#111827'; ctx.font='12px system-ui'; const mean=data.reduce((a,b)=>a+b,0)/data.length; ctx.fillText(`count=${data.length}`, x0, y0-h-8); ctx.fillText(`mean=${mean.toFixed(2)}`, x0+120, y0-h-8);
+
+  window.lastHistSnapshot = { bins, min:xmin, max:xmax, cnt, pad, w, h, x0, y0, W, H, ymax, wbin };
+}
+
+// UI buttons
+document.getElementById('run').addEventListener('click', ()=>{ try { generate(); const s=document.getElementById('status'); if(s) s.textContent='generated'; } catch(err){ const s=document.getElementById('status'); if(s) s.textContent='Error on run: '+err.message; alert('Error on run: '+err.message); } });
+
+document.getElementById('matchF0').addEventListener('click', ()=>{ try { window.greedyMatchF0(); const s=document.getElementById('status'); if(s) s.textContent='matched F0'; } catch(err){ const s=document.getElementById('status'); if(s) s.textContent='Error on matchF0: '+err.message; alert('Error on matchF0: '+err.message); } });
+
+document.getElementById('reset').addEventListener('click', ()=>{ try { state={ all:[], insideClipped:[], chosenIdx:new Set(), stats:{F0:0, insideCount:0, chosenCount:0} }; ['statInside','statSel','statF0'].forEach(id=>document.getElementById(id).textContent='-'); ['geom','hist'].forEach(id=>{ const c=document.getElementById(id); c.getContext('2d').clearRect(0,0,c.width,c.height); }); const s=document.getElementById('status'); if(s) s.textContent='reset'; } catch(err){ const s=document.getElementById('status'); if(s) s.textContent='Error on reset: '+err.message; alert('Error on reset: '+err.message); } });
+
+generate();
+
+// Geometry export (SVG/PDF)
+function downloadGeometryAsSVG() {
+  const n = +document.getElementById('n').value; const m = +document.getElementById('m').value; const scale = +document.getElementById('genScale').value;
+  const rx0=0, ry0=0, rx1=n, ry1=m; const cx=(rx0+rx1)/2, cy=(ry0+ry1)/2; const gx0=cx-(n*scale)/2, gx1=cx+(n*scale)/2; const gy0=cy-(m*scale)/2, gy1=cy+(m*scale)/2;
+  const W=800, H=800; const pad=30; const sx=(W-2*pad)/(gx1-gx0); const sy=(H-2*pad)/(gy1-gy0); const s=Math.min(sx,sy); const ox=pad - gx0*s; const oy=H-pad + gy0*s;
+  const map=(x,y)=>[ox + x*s, oy - y*s];
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
+  svg += `<rect width="${W}" height="${H}" fill="white"/>`;
+  let [a,b] = map(gx0,gy0), [c,d] = map(gx1,gy1); svg += `<rect x="${Math.min(a,c)}" y="${Math.min(b,d)}" width="${Math.abs(c-a)}" height="${Math.abs(d-b)}" fill="none" stroke="#9ca3af" stroke-width="2"/>`;
+}
+</script>
+
+<script>
+// Histogram SVG export
+function buildHistSVG(snap){ if (!snap) return ''; const { bins, min, max, cnt, pad, w, h, x0, y0, W, H, ymax, wbin } = snap; const lines = []; lines.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`); lines.push(`<rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff"/>`); lines.push(`<rect x="${x0}" y="${y0-h}" width="${w}" height="${h}" fill="none" stroke="#d1d5db"/>`);
+  for (let i=0;i<bins;i++){ const bh = (ymax>0? cnt[i]/ymax*(h-2) : 0); const rx = x0 + i*wbin + 1; const ry = y0 - bh; const rw = Math.max(0, wbin - 2); const rh = Math.max(0, bh); lines.push(`<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="#60a5fa"/>`); }
+  const rangeX = Math.max(0, max - min); const targetTicks = 6; function niceIntStep(r){ if (r <= 0) return 1; const pow10 = Math.pow(10, Math.floor(Math.log10(r/targetTicks))); const candidates = [1, 2, 5, 10]; let best = pow10; let bestDiff = Infinity; for (const c of candidates){ const s = c * pow10; const n = r / s; const diff = Math.abs(n - targetTicks); if (diff < bestDiff){ bestDiff = diff; best = s; } } return Math.max(1, Math.round(best)); }
+  const step = niceIntStep(rangeX); for (let v = 0; v <= max + 1e-9; v += step){ const u = (v - min) / (max - min || 1); const x = x0 + u * w; lines.push(`<line x1="${x}" y1="${y0+1}" x2="${x}" y2="${y0+6}" stroke="#9ca3af"/>`); lines.push(`<text x="${x}" y="${y0+8}" font-family="system-ui, -apple-system, Segoe UI, Roboto" font-size="12" text-anchor="middle" fill="#111827">${String(Math.round(v))}</text>`); }
+  lines.push(`</svg>`); return lines.join('\n'); }
+function downloadHistSVG(){ const svg = buildHistSVG(window.lastHistSnapshot); if (!svg){ alert('Histogram is not yet drawn. Please generate data first.'); return; } const blob = new Blob([svg], {type:'image/svg+xml;charset=utf-8'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'histogram.svg'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 500); }
+document.addEventListener('DOMContentLoaded', ()=>{ const btn = document.getElementById('btnHistSvg'); if (btn) btn.addEventListener('click', downloadHistSVG); });
+// Length CSV (used by histogram)
+function collectSelectedLengths(){ const arr = []; state.insideClipped.forEach((s,i)=>{ if(state.chosenIdx.has(i)) arr.push(s.Lin); }); return arr; }
+function downloadSelectedLengthsCSV(){ const lengths = collectSelectedLengths(); if (!lengths.length){ alert('No data to export. Generate or match F0 first so the histogram has data.'); return; } let lines = ['length']; for (const v of lengths){ lines.push(String(v)); } const csv = lines.join('\n'); const blob = new Blob([csv], {type:'text/csv;charset=utf-8'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); const ts = new Date().toISOString().replace(/[:.]/g,'-'); a.href = url; a.download = `selected_lengths_${ts}.csv`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 500); }
+const btnCsv = document.getElementById('btnCsvLen'); if (btnCsv) btnCsv.addEventListener('click', downloadSelectedLengthsCSV);
+</script>
+
+<script>
+// Greedy matcher (distribution-preserving)
+window.greedyMatchF0 = function(){
+  const n=+document.getElementById('n').value, m=+document.getElementById('m').value; const A=n*m; const targetF0=+document.getElementById('F0target').value; const T = targetF0 * A; const inside = state.insideClipped;
+  let S_total = 0; for (const s of inside) S_total += s.Lin2;
+  if (T >= S_total) { state.chosenIdx = new Set(inside.map((_, i) => i)); updateStats(n,m); const rx0=0,ry0=0,rx1=n,ry1=m; const cx=(rx0+rx1)/2, cy=(ry0+ry1)/2; const scale=+document.getElementById('genScale').value; const gx0=cx-(n*scale)/2, gx1=cx+(n*scale)/2, gy0=cy-(m*scale)/2, gy1=cy+(m*scale)/2; drawAll(n,m, gx0,gx1,gy0,gy1, rx0,rx1,ry0,ry1); return; }
+  if (T <= 0) { state.chosenIdx = new Set(); updateStats(n,m); const rx0=0,ry0=0,rx1=n,ry1=m; const cx=(rx0+rx1)/2, cy=(ry0+ry1)/2; const scale=+document.getElementById('genScale').value; const gx0=cx-(n*scale)/2, gx1=cx+(n*scale)/2, gy0=cy-(m*scale)/2, gy1=cy+(m*scale)/2; drawAll(n,m, gx0,gx1,gy0,gy1, rx0,rx1,ry0,ry1); return; }
+
+  const seed=+document.getElementById('seed').value || 20250919; const rng = RNG(seed); const shuffle = (arr) => { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
+  const f = T / S_total; const bins = 24; const lengths = inside.map(s => s.Lin); const Lmin = Math.min(...lengths); const Lmax = Math.max(...lengths); const eps = 1e-12; const binWidth = (Lmax - Lmin + eps) / bins; const binIdx = Array.from({length: bins}, () => []);
+  for (let i=0;i<inside.length;i++){ const k = Math.min(bins-1, Math.floor((inside[i].Lin - Lmin) / binWidth)); binIdx[k].push(i); }
+
+  const chosen = new Set(); let sumChosen = 0;
+  for (let b=0;b<bins;b++){
+    const idxs = binIdx[b]; if (idxs.length === 0) continue; let S_bin = 0; for (const i of idxs) S_bin += inside[i].Lin2; const T_bin = f * S_bin; if (T_bin <= 0) continue; const shuffled = shuffle(idxs.slice()); let sumB = 0; for (const i of shuffled){ const add = inside[i].Lin2; const addErr = Math.abs(T_bin - (sumB + add)); const keepErr = Math.abs(T_bin - sumB); if (addErr <= keepErr || sumB === 0) { chosen.add(i); sumB += add; if (sumB >= T_bin) break; } } sumChosen += sumB; }
+
+  const allIdx = inside.map((_,i)=>i); const remain = shuffle(allIdx.filter(i => !chosen.has(i)));
+  while (sumChosen < T && remain.length){ let bestJ = -1, bestErr = Infinity; const sampleCount = Math.min(20, remain.length); for (let s=0; s<sampleCount; s++){ const j = remain[s]; const err = Math.abs(T - (sumChosen + inside[j].Lin2)); if (err < bestErr) { bestErr = err; bestJ = j; } } if (bestJ === -1) break; chosen.add(bestJ); sumChosen += inside[bestJ].Lin2; const pos = remain.indexOf(bestJ); if (pos >= 0) remain.splice(pos,1); }
+
+  if (sumChosen > T && chosen.size){ const sortedChosen = Array.from(chosen).sort((a,b)=>inside[a].Lin2 - inside[b].Lin2); for (const i of sortedChosen){ const after = sumChosen - inside[i].Lin2; const removeImprove = Math.abs(T - after) <= Math.abs(T - sumChosen); if (removeImprove){ chosen.delete(i); sumChosen = after; if (sumChosen <= T) break; } } }
+
+  state.chosenIdx = chosen; updateStats(n,m); const rx0=0,ry0=0,rx1=n,ry1=m; const cx=(rx0+rx1)/2, cy=(ry0+ry1)/2; const scale=+document.getElementById('genScale').value; const gx0=cx-(n*scale)/2, gx1=cx+(n*scale)/2, gy0=cy-(m*scale)/2, gy1=cy+(m*scale)/2; drawAll(n,m, gx0,gx1,gy0,gy1, rx0,rx1,ry0,ry1);
+};
+</script>
+
+<script>
+window.addEventListener('error', function(e){ const s = document.getElementById('status'); if (s) s.textContent = 'Error: ' + (e.message || e.error); alert('JavaScript Error: ' + (e.message || e.error)); });
+document.addEventListener('DOMContentLoaded', function(){ var s = document.getElementById('status'); if (s) s.textContent = 'ready (greedyMatchF0=' + (typeof window.greedyMatchF0) + ')'; });
+</script>
+
+</body>
+</html>
