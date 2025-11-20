@@ -91,3 +91,4 @@ Oda, M., Katsube, T., & Takemura, T. (2002). Microcrack evolution and brittle fa
 
 ---
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17657073.svg)](https://doi.org/10.5281/zenodo.17657073)
